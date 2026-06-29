@@ -1,0 +1,15 @@
+# MagDrive robots.txt
+User-agent: *
+Allow: /$
+Allow: /privacy
+Allow: /terms
+Allow: /contact
+# App + API surfaces aren't useful to crawlers
+Disallow: /api/
+Disallow: /browse
+Disallow: /magazines
+Disallow: /billing
+Disallow: /reset-password
+Disallow: /auth/
+
+Sitemap: https://magdrive.app/sitemap.xml

@@ -1,0 +1,21 @@
+{
+  "name": "magdrive",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MagDrive — a Google-Drive-style storage app with a magazine-format UI. React + Node.js. Built to the VIBECODE_TO_PRODUCTION readiness framework.",
+  "type": "module",
+  "scripts": {
+    "install:all": "npm install && npm --prefix server install && npm --prefix client install",
+    "dev": "concurrently -n server,client -c blue,magenta \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "build": "npm --prefix client run build",
+    "start": "npm --prefix server start"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}

@@ -1,0 +1,19 @@
+node_modules/
+dist/
+build/
+
+# Secrets out of the repo (Rule #8)
+.env
+.env.local
+server/.env
+
+# Runtime data: sqlite db + uploaded files
+server/data/
+*.sqlite
+*.sqlite-journal
+*.db
+
+# Logs / OS
+*.log
+.DS_Store
+Thumbs.db
