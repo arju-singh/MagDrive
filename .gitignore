@@ -13,6 +13,9 @@ server/data/
 *.sqlite-journal
 *.db
 
+# Firebase deploy cache
+.firebase/
+
 # Logs / OS
 *.log
 .DS_Store
