@@ -25,7 +25,7 @@ const upload = multer({
   limits: { fileSize: config.maxFileBytes }, // size cap (Checklist: Security)
 });
 
-function serialize(f) {
+export function serialize(f) {
   return {
     id: f.id,
     name: f.name,
@@ -104,6 +104,7 @@ router.post('/', requireAuth, upload.array('files', 50), async (req, res) => {
   `);
 
   const created = [];
+  const failed = [];
   for (const part of req.files) {
     const id = randomUUID();
     const original = Buffer.from(part.originalname, 'latin1').toString('utf8'); // multer latin1 -> utf8
@@ -112,7 +113,11 @@ router.post('/', requireAuth, upload.array('files', 50), async (req, res) => {
     try {
       await storage.put(key, part.path); // moves temp file into the adapter
     } catch (e) {
+      // Don't silently swallow — a full disk (ENOSPC) used to return 201 with an
+      // empty list, so uploads looked like they "worked" but nothing appeared.
       logger.error('storage put failed', { code: e.code });
+      fs.promises.unlink(part.path).catch(() => {}); // free the orphaned temp part
+      failed.push({ name: original, code: e.code });
       continue;
     }
     const row = {
@@ -135,8 +140,18 @@ router.post('/', requireAuth, upload.array('files', 50), async (req, res) => {
     scheduleThumb(row);
   }
 
-  logger.info('files uploaded', { userId, count: created.length });
-  res.status(201).json({ files: created });
+  // If every file failed to store, report it instead of faking success.
+  if (!created.length && failed.length) {
+    const outOfSpace = failed.some((f) => f.code === 'ENOSPC');
+    logger.error('upload failed for all files', { userId, count: failed.length, outOfSpace });
+    return res.status(outOfSpace ? 507 : 500).json({
+      error: outOfSpace ? 'insufficient_storage' : 'storage_failed',
+      failed: failed.map((f) => f.name),
+    });
+  }
+
+  logger.info('files uploaded', { userId, count: created.length, failed: failed.length });
+  res.status(201).json({ files: created, ...(failed.length ? { failed: failed.map((f) => f.name) } : {}) });
 });
 
 function getOwnedFile(userId, id) {
@@ -233,7 +248,7 @@ function pumpThumbs() {
 
 // Ensure a thumbnail is (being) generated; returns a Promise that resolves when done.
 // No-op for non-thumbnable kinds. Deduped via thumbInFlight.
-function scheduleThumb(f) {
+export function scheduleThumb(f) {
   if (!THUMBNABLE.includes(f.kind)) return Promise.resolve();
   if (thumbInFlight.has(f.id)) return thumbInFlight.get(f.id);
   let done;

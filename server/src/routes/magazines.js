@@ -5,7 +5,10 @@ import { requireAuth } from '../auth.js';
 
 const router = express.Router();
 
-const THEMES = ['editorial', 'mono', 'vogue', 'zine', 'noir'];
+const THEMES = ['editorial', 'mono', 'vogue', 'zine', 'noir', 'y2k', 'pastel', 'neon'];
+const BLOCK_TYPES = ['cover', 'heading', 'text', 'image', 'gallery', 'video', 'quote', 'spacer', 'carousel'];
+// Gen-Z carousel visual styles. Kept in sync with CAROUSEL_VARIANTS on the client.
+const CAROUSEL_VARIANTS = ['swipe', 'story', 'polaroid', 'filmstrip', 'tape', 'sticker', 'neon', 'y2k', 'bubble', 'marquee', 'peek', 'cutout'];
 const MAX_LAYOUT_BYTES = 256 * 1024; // guardrail on stored JSON size
 
 function serialize(m) {
@@ -46,14 +49,14 @@ function normalizeLayout(input) {
   return {
     blocks: blocks.slice(0, 200).map((b) => ({
       id: typeof b?.id === 'string' ? b.id : randomUUID(),
-      type: ['cover', 'heading', 'text', 'image', 'gallery', 'video', 'quote', 'spacer'].includes(b?.type)
-        ? b.type
-        : 'text',
+      type: BLOCK_TYPES.includes(b?.type) ? b.type : 'text',
       text: typeof b?.text === 'string' ? b.text.slice(0, 5000) : '',
       fileId: typeof b?.fileId === 'string' ? b.fileId : null,
       fileIds: Array.isArray(b?.fileIds) ? b.fileIds.filter((x) => typeof x === 'string').slice(0, 30) : [],
       align: ['left', 'center', 'right'].includes(b?.align) ? b.align : 'left',
       size: ['s', 'm', 'l', 'full'].includes(b?.size) ? b.size : 'm',
+      // Carousel-only styling hint; harmless on other blocks. Defaults to 'swipe'.
+      variant: CAROUSEL_VARIANTS.includes(b?.variant) ? b.variant : 'swipe',
     })),
   };
 }

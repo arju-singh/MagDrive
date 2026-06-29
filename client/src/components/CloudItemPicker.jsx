@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api, srcThumbUrl } from '../api.js';
-import { icon } from './kindIcon.js';
+import { kindIconMarkup } from './kindIcon.js';
 
 const KIND_TABS = [
   { key: '', label: 'All' },
@@ -71,7 +71,7 @@ export default function CloudItemPicker({ connections, onAdd, onClose }) {
               {items.map((it) => (
                 <div key={keyOf(it)} className={`pick ${sel[keyOf(it)] ? 'sel' : ''}`} onClick={() => toggle(it)} title={it.name}>
                   <img src={srcThumbUrl(it)} alt={it.name} loading="lazy"
-                    onError={(e) => { e.currentTarget.replaceWith(Object.assign(document.createElement('div'), { className: 'docp', textContent: icon(it.kind) })); }} />
+                    onError={(e) => { e.currentTarget.replaceWith(Object.assign(document.createElement('div'), { className: 'docp', innerHTML: kindIconMarkup(it.kind) })); }} />
                 </div>
               ))}
             </div>

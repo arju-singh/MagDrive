@@ -25,6 +25,7 @@ function Cover({ tpl }) {
         <div className="tpl-cover-fallback" style={{ background: `linear-gradient(135deg, ${bg}, #2a2622)` }} />
       )}
       <div className="tpl-cover-shade" />
+      {tpl.carousel && <span className="tpl-badge">🎠 swipe</span>}
       <div className="tpl-cover-text">
         <div className="tpl-kicker">{tpl.label} · {tpl.theme}</div>
         <div className="tpl-mast">{tpl.name}</div>
@@ -41,7 +42,12 @@ export default function TemplateGallery({ onChoose, onClose, creating }) {
   const [cat, setCat] = useState('all');
 
   const shown = useMemo(
-    () => TEMPLATES.filter((t) => cat === 'all' || t.id === 'blank' || t.category === cat),
+    () => TEMPLATES.filter((t) => {
+      if (cat === 'all') return true;
+      if (t.id === 'blank') return true;
+      if (cat === '__carousel') return !!t.carousel;
+      return t.category === cat;
+    }),
     [cat],
   );
 
@@ -59,7 +65,7 @@ export default function TemplateGallery({ onChoose, onClose, creating }) {
               <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
             </label>
             <div style={{ alignSelf: 'flex-end', color: 'var(--c-ink-soft)', fontSize: 13 }}>
-              {shown.length - (cat === 'all' ? 1 : 0)} designs
+              {shown.length - (cat === 'all' || cat === '__carousel' ? 1 : 0)} designs
             </div>
           </div>
 

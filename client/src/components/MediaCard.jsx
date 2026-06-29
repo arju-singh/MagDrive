@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { srcThumbUrl } from '../api.js';
-import { icon } from './kindIcon.js';
+import { KindIcon } from './kindIcon.js';
 
 const SOURCE_BADGE = { local: 'Library', demo: 'Demo', google: 'Drive', dropbox: 'Dropbox' };
 
@@ -12,7 +12,7 @@ export default function MediaCard({ item, onOpen, onRemove }) {
       onKeyDown={(e) => { if (e.key === 'Enter') onOpen?.(item); }}>
       {!failed
         ? <img className="ncard-img" src={srcThumbUrl(item)} alt={item.name} loading="lazy" onError={() => setFailed(true)} />
-        : <div className="ncard-fallback">{icon(item.kind)}</div>}
+        : <div className="ncard-fallback"><KindIcon kind={item.kind} size={42} /></div>}
       {item.kind === 'video' && <span className="ncard-play">▶</span>}
       <span className="ncard-source">{SOURCE_BADGE[item.source] || item.source}</span>
       {onRemove && (

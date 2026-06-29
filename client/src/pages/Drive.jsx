@@ -6,6 +6,8 @@ import { KIND_LABEL } from '../components/kindIcon.js';
 import FileTile from '../components/FileTile.jsx';
 import Uploader from '../components/Uploader.jsx';
 import Viewer from '../components/Viewer.jsx';
+import ImportDrive from '../components/ImportDrive.jsx';
+import Icon from '../components/Icon.jsx';
 import { Character, Sparkle, Star, Bolt } from '../components/art.jsx';
 
 const PAGE = 60;
@@ -23,6 +25,7 @@ export default function Drive() {
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState(null);
+  const [importing, setImporting] = useState(false);
 
   const title = q ? `Search: ${q}` : starred ? 'Starred' : kind ? KIND_LABEL[kind] : 'The Library';
 
@@ -75,6 +78,12 @@ export default function Drive() {
         </div>
       </div>
 
+      <div className="row" style={{ justifyContent: 'flex-end', marginBottom: 'var(--sp-3)' }}>
+        <button className="btn btn--sm btn--primary" onClick={() => setImporting(true)}>
+          <Icon name="upload" size={15} /> Import from Drive
+        </button>
+      </div>
+
       <Uploader onUploaded={onUploaded} />
 
       {loading && files.length === 0 ? (
@@ -104,6 +113,10 @@ export default function Drive() {
 
       {active && (
         <Viewer file={active} onClose={() => setActive(null)} onChanged={onChanged} onDeleted={onDeleted} />
+      )}
+
+      {importing && (
+        <ImportDrive onImported={(created) => onUploaded(created)} onClose={() => setImporting(false)} />
       )}
     </>
   );

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { srcMediaUrl } from '../api.js';
-import { icon } from './kindIcon.js';
+import { KindIcon } from './kindIcon.js';
 
 // Universal viewer for any-source item (local or cloud). Read-only (no rename/delete).
 export default function MediaModal({ item, onClose }) {
@@ -26,7 +26,7 @@ export default function MediaModal({ item, onClose }) {
           {item.kind === 'pdf' && <iframe title={item.name} src={url} />}
           {(item.kind === 'doc' || item.kind === 'other') && (
             <div className="center" style={{ padding: 40 }}>
-              <div style={{ fontSize: 64 }}>{icon(item.kind)}</div>
+              <div><KindIcon kind={item.kind} size={64} /></div>
               <a className="btn btn--primary" href={url} target="_blank" rel="noreferrer">Open original</a>
             </div>
           )}

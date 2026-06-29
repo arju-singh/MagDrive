@@ -111,6 +111,9 @@ export const api = {
     const q = new URLSearchParams(params).toString();
     return request('GET', `/api/cloud/${provider}/files${q ? `?${q}` : ''}`);
   },
+  // Copy selected cloud files into the local library (permanent, source untouched).
+  cloudImport: (provider, items, folderId) =>
+    request('POST', `/api/cloud/${provider}/import`, { items, folderId }),
 
   // shelves (Netflix custom rows)
   listShelves: () => request('GET', '/api/shelves'),

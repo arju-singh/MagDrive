@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { mediaUrl, formatBytes, api } from '../api.js';
-import { icon } from './kindIcon.js';
+import { KindIcon } from './kindIcon.js';
 
 // Full-screen viewer for a file. Handles image / video / audio / pdf / fallback download.
 export default function Viewer({ file, onClose, onChanged, onDeleted }) {
@@ -60,7 +60,7 @@ export default function Viewer({ file, onClose, onChanged, onDeleted }) {
           {file.kind === 'pdf' && <iframe title={file.name} src={mediaUrl(file.id)} />}
           {(file.kind === 'doc' || file.kind === 'other') && (
             <div className="center" style={{ padding: 40 }}>
-              <div style={{ fontSize: 64 }}>{icon(file.kind)}</div>
+              <div><KindIcon kind={file.kind} size={64} /></div>
               <p className="muted">{formatBytes(file.size)} · {file.mime}</p>
               <a className="btn btn--primary" href={mediaUrl(file.id, { download: true })} download>Download to view</a>
             </div>

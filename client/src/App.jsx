@@ -4,6 +4,7 @@ import { useAuth } from './auth.jsx';
 import { RefreshProvider } from './refresh.jsx';
 import { pageview } from './analytics.js';
 import Login from './components/Login.jsx';
+import Landing from './pages/Landing.jsx';
 import Shell from './components/Shell.jsx';
 import Drive from './pages/Drive.jsx';
 import Browse from './pages/Browse.jsx';
@@ -59,8 +60,16 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/auth/callback" element={<GoogleCallback />} />
 
-        {/* Everything else: the app when authed, the login wall otherwise. */}
-        <Route path="/*" element={user ? <AppShell /> : <Login />} />
+        {/* Everything else: the app when authed; a landing page + login wall otherwise. */}
+        {user ? (
+          <Route path="/*" element={<AppShell />} />
+        ) : (
+          <>
+            <Route path="/" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </>
+        )}
       </Routes>
       <CookieConsent />
     </>

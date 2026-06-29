@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { mediaUrl, thumbUrl, formatBytes } from '../api.js';
-import { icon } from './kindIcon.js';
+import { KindIcon } from './kindIcon.js';
 
 // Thumbnail with graceful fallback: try the cached server thumbnail first; if it 404s
 // (unsupported kind / generator missing), fall back to rendering the original.
@@ -34,7 +34,13 @@ function Thumb({ file }) {
       </div>
     );
   }
-  return <div className="doc-thumb">{icon(file.kind)}</div>;
+  const ext = (file.name.split('.').pop() || file.kind).toUpperCase().slice(0, 5);
+  return (
+    <div className={`doc-thumb kind-${file.kind}`}>
+      <KindIcon kind={file.kind} size={56} />
+      <span className="doc-ext">{ext}</span>
+    </div>
+  );
 }
 
 // A single magazine-style media tile.

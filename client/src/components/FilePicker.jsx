@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, mediaUrl, thumbUrl } from '../api.js';
-import { icon } from './kindIcon.js';
+import { KindIcon } from './kindIcon.js';
 
 // Modal to pick file(s) from the user's library. multiple=false returns one id.
 export default function FilePicker({ multiple = false, kind = '', onPick, onClose }) {
@@ -38,7 +38,7 @@ export default function FilePicker({ multiple = false, kind = '', onPick, onClos
                 <div key={f.id} className={`pick ${sel.includes(f.id) ? 'sel' : ''}`} onClick={() => toggle(f.id)} title={f.name}>
                   {f.kind === 'image' || f.kind === 'video'
                     ? <img src={thumbUrl(f.id)} alt={f.name} loading="lazy" onError={(e) => { e.currentTarget.src = mediaUrl(f.id); }} />
-                    : <div className="docp">{icon(f.kind)}</div>}
+                    : <div className="docp"><KindIcon kind={f.kind} size={26} /></div>}
                 </div>
               ))}
             </div>

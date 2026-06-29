@@ -3,28 +3,33 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { api, mediaUrl } from '../api.js';
 import { useRefresh } from '../refresh.jsx';
 import FilePicker from '../components/FilePicker.jsx';
+import Carousel from '../components/Carousel.jsx';
+import Icon from '../components/Icon.jsx';
+import { CAROUSEL_VARIANTS } from '../templates.js';
 
-const THEMES = ['editorial', 'mono', 'vogue', 'zine', 'noir'];
+const THEMES = ['editorial', 'mono', 'vogue', 'zine', 'noir', 'y2k', 'pastel', 'neon'];
 const BLOCK_TYPES = [
-  { type: 'cover', label: '📔 Cover', media: true },
-  { type: 'heading', label: '🔠 Heading' },
-  { type: 'text', label: '¶ Text' },
-  { type: 'quote', label: '❝ Pull-quote' },
-  { type: 'image', label: '🖼️ Image', media: true },
-  { type: 'video', label: '🎬 Video', media: true },
-  { type: 'gallery', label: '🔳 Gallery', media: true },
-  { type: 'spacer', label: '␣ Spacer' },
+  { type: 'cover', label: 'Cover', icon: 'cover', media: true },
+  { type: 'heading', label: 'Heading', icon: 'heading' },
+  { type: 'text', label: 'Text', icon: 'text' },
+  { type: 'quote', label: 'Pull-quote', icon: 'quote' },
+  { type: 'image', label: 'Image', icon: 'image', media: true },
+  { type: 'video', label: 'Video', icon: 'video', media: true },
+  { type: 'gallery', label: 'Gallery', icon: 'gallery', media: true },
+  { type: 'carousel', label: 'Carousel', icon: 'carousel', media: true },
+  { type: 'spacer', label: 'Spacer', icon: 'spacer' },
 ];
 
 let tmpId = 0;
 const newId = () => `b_${Date.now()}_${tmpId++}`;
 
 function defaultBlock(type) {
-  const base = { id: newId(), type, text: '', fileId: null, fileIds: [], align: 'left', size: 'm' };
+  const base = { id: newId(), type, text: '', fileId: null, fileIds: [], align: 'left', size: 'm', variant: 'swipe' };
   if (type === 'heading') base.text = 'A Bold Headline';
   if (type === 'text') base.text = 'Write your story here…';
   if (type === 'quote') base.text = 'A line worth pulling out.';
   if (type === 'cover') base.text = 'COVER STORY';
+  if (type === 'carousel') { base.text = 'swipe →'; base.size = 'full'; }
   return base;
 }
 
@@ -134,7 +139,9 @@ export default function MagazineEditor() {
             <span className="tag" style={{ display: 'block', marginBottom: 8 }}>Add a block</span>
             <div className="block-btns">
               {BLOCK_TYPES.map((b) => (
-                <button key={b.type} className="btn btn--sm" onClick={() => addBlock(b.type)}>{b.label}</button>
+                <button key={b.type} className="btn btn--sm" onClick={() => addBlock(b.type)}>
+                  <Icon name={b.icon} size={15} /> {b.label}
+                </button>
               ))}
             </div>
           </div>
@@ -234,7 +241,7 @@ function EditableBlock({ block, onUpdate, onRemove, onMove, onPickMedia }) {
         <div>
           {block.fileId
             ? <img className="blk-img" src={mediaUrl(block.fileId)} alt="" />
-            : <div className="doc-thumb" style={{ borderRadius: 6 }}>🖼️</div>}
+            : <div className="doc-thumb kind-image" style={{ borderRadius: 6 }}><Icon name="image" size={40} /></div>}
           <button className="btn btn--sm" onClick={() => onPickMedia({ multiple: false, kind: 'image' })} style={{ marginTop: 8 }}>
             {block.fileId ? 'Change image' : 'Choose image'}
           </button>
@@ -246,7 +253,7 @@ function EditableBlock({ block, onUpdate, onRemove, onMove, onPickMedia }) {
         <div>
           {block.fileId
             ? <video className="blk-img" src={mediaUrl(block.fileId)} controls />
-            : <div className="doc-thumb" style={{ borderRadius: 6 }}>🎬</div>}
+            : <div className="doc-thumb kind-video" style={{ borderRadius: 6 }}><Icon name="video" size={40} /></div>}
           <button className="btn btn--sm" onClick={() => onPickMedia({ multiple: false, kind: 'video' })} style={{ marginTop: 8 }}>
             {block.fileId ? 'Change video' : 'Choose video'}
           </button>
@@ -260,10 +267,35 @@ function EditableBlock({ block, onUpdate, onRemove, onMove, onPickMedia }) {
             <div className="blk-gallery">
               {block.fileIds.map((fid) => <img key={fid} src={mediaUrl(fid)} alt="" />)}
             </div>
-          ) : <div className="doc-thumb" style={{ borderRadius: 6 }}>🔳</div>}
+          ) : <div className="doc-thumb kind-other" style={{ borderRadius: 6 }}><Icon name="gallery" size={40} /></div>}
           <button className="btn btn--sm" onClick={() => onPickMedia({ multiple: true, kind: 'image' })} style={{ marginTop: 8 }}>
             {block.fileIds?.length ? `Edit selection (${block.fileIds.length})` : 'Choose images'}
           </button>
+        </div>
+      )}
+
+      {block.type === 'carousel' && (
+        <div>
+          <Carousel fileIds={block.fileIds} variant={block.variant} caption={block.text} size={block.size} />
+          <div className="row wrap" style={{ marginTop: 8, gap: 8 }}>
+            <button className="btn btn--sm" onClick={() => onPickMedia({ multiple: true, kind: 'image' })}>
+              {block.fileIds?.length ? `Edit photos (${block.fileIds.length})` : 'Choose photos'}
+            </button>
+            <select
+              className="input select btn--sm"
+              style={{ width: 'auto', minHeight: 32 }}
+              value={block.variant || 'swipe'}
+              onChange={(e) => onUpdate({ variant: e.target.value })}
+              title="Carousel style"
+            >
+              {CAROUSEL_VARIANTS.map((v) => <option key={v.key} value={v.key}>style: {v.label}</option>)}
+            </select>
+          </div>
+          <label className="field" style={{ marginTop: 8 }}>
+            <span className="tag">Caption</span>
+            <input className="input" value={block.text} onChange={(e) => onUpdate({ text: e.target.value })} placeholder="swipe →" />
+          </label>
+          <MediaControls block={block} onUpdate={onUpdate} />
         </div>
       )}
 
