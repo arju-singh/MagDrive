@@ -44,10 +44,16 @@ function Thumb({ file }) {
 }
 
 // A single magazine-style media tile.
-export default function FileTile({ file, onOpen, onToggleStar }) {
+// When `draggable` is set, the tile can be dragged onto a folder/breadcrumb to move it.
+export default function FileTile({ file, onOpen, onToggleStar, draggable = false }) {
   return (
     <figure className="tile" onClick={() => onOpen(file)} tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter') onOpen(file); }}>
+      onKeyDown={(e) => { if (e.key === 'Enter') onOpen(file); }}
+      draggable={draggable}
+      onDragStart={draggable ? (e) => {
+        e.dataTransfer.setData('text/magdrive-file', file.id);
+        e.dataTransfer.effectAllowed = 'move';
+      } : undefined}>
       <span className="kind-flag">{file.kind}</span>
       <button className="star" title={file.starred ? 'Unstar' : 'Star'}
         onClick={(e) => { e.stopPropagation(); onToggleStar(file); }}>

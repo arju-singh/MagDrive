@@ -29,6 +29,9 @@ const PATHS = {
   gallery: '<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/>',
   carousel: '<rect x="6.5" y="6" width="11" height="12" rx="2"/><path d="M3.5 9v6M20.5 9v6"/>',
   spacer: '<path d="M4 7h16M4 17h16"/><path d="M12 10v4"/><path d="m10.5 11.2 1.5-1.5 1.5 1.5M10.5 12.8l1.5 1.5 1.5-1.5"/>',
+  // Folders
+  folder: '<path d="M3 7.5A2 2 0 0 1 5 5.5h3.7a2 2 0 0 1 1.4.6l1 1a2 2 0 0 0 1.4.6H19a2 2 0 0 1 2 2v7.3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  'folder-plus': '<path d="M3 7.5A2 2 0 0 1 5 5.5h3.7a2 2 0 0 1 1.4.6l1 1a2 2 0 0 0 1.4.6H19a2 2 0 0 1 2 2v7.3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11.8v4.4M9.8 14h4.4"/>',
 };
 
 const COMMON = {

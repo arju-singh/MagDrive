@@ -745,3 +745,50 @@ label.field > span { display: block; font-family: var(--font-mono); font-size: v
 .landing-foot__links { display: flex; gap: var(--sp-4); align-items: center; }
 .landing-foot__links a, .landing-foot__links .linklike { color: var(--c-ink); font-weight: 700; font-size: var(--fs-sm); }
 .landing-foot__links a:hover { color: var(--c-accent); }
+
+/* ---------- Folders (library hierarchy) ---------- */
+.breadcrumb { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; margin-bottom: var(--sp-4); }
+.breadcrumb .crumb-wrap { display: inline-flex; align-items: center; gap: 2px; }
+.breadcrumb .crumb-sep { color: var(--c-ink-soft); margin: 0 2px; }
+.crumb { display: inline-flex; align-items: center; gap: 5px; border: 1px solid transparent; background: transparent;
+  border-radius: var(--r-sm); padding: 4px 10px; min-height: 30px; cursor: pointer; color: var(--c-ink);
+  font-family: var(--font-mono); font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+  transition: background .14s ease, border-color .14s ease; }
+.crumb:not(:disabled):hover { background: var(--glass-bg-2); border-color: var(--glass-border-soft); }
+.crumb.current { color: var(--c-ink-soft); cursor: default; }
+.crumb.drop-over { background: linear-gradient(135deg, rgba(255,209,102,0.5), rgba(109,139,255,0.4)); border-color: var(--c-accent); color: var(--c-ink); }
+
+.folder-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--sp-3); margin-bottom: var(--sp-5); }
+.folder-tile { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-3); min-height: 56px;
+  background: var(--glass-bg-2); border: var(--bd); border-radius: var(--r-md); box-shadow: var(--sh-1); cursor: pointer; position: relative;
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  transition: transform .14s ease, box-shadow .18s ease, border-color .14s ease; }
+.folder-tile:hover { transform: translateY(-2px); box-shadow: var(--sh-2); }
+.folder-tile.drop-over { border-color: var(--c-accent); box-shadow: var(--sh-accent); background: linear-gradient(135deg, rgba(255,209,102,0.4), rgba(109,139,255,0.35)); }
+.folder-tile .folder-ico { color: var(--c-accent-2); flex: 0 0 auto; }
+.folder-tile .folder-name { flex: 1; font-weight: 700; font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-tile .folder-rename { flex: 1; min-width: 0; padding: 4px 8px; font-size: var(--fs-sm); }
+.folder-tile .folder-actions { display: flex; gap: 2px; opacity: 0; transition: opacity .14s ease; }
+.folder-tile:hover .folder-actions, .folder-tile:focus-within .folder-actions { opacity: 1; }
+.folder-act { width: 28px; height: 28px; border: var(--bd); border-radius: var(--r-sm); background: var(--glass-bg-strong); color: var(--c-ink);
+  cursor: pointer; font-size: 13px; display: grid; place-items: center; }
+.folder-act:hover { background: var(--c-yellow); }
+.folder-act.danger { background: var(--c-danger); color: #fff; }
+
+/* Inline "new folder" composer (replaces a native prompt) */
+.folder-compose { display: inline-flex; align-items: center; gap: var(--sp-2); padding: 4px 8px;
+  background: var(--glass-bg-2); border: var(--bd); border-radius: var(--r-sm); box-shadow: var(--sh-1); }
+.folder-compose .folder-ico, .folder-compose svg { color: var(--c-accent-2); flex: 0 0 auto; }
+.folder-compose .input { width: 180px; padding: 5px 9px; font-size: var(--fs-sm); }
+
+/* Move-to-folder picker */
+.move-modal { max-width: 460px; }
+.move-path { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; padding: var(--sp-3) var(--sp-4) 0; }
+.move-list { padding: var(--sp-3) var(--sp-4); overflow-y: auto; max-height: 46vh; display: flex; flex-direction: column; gap: 4px; }
+.move-row { display: flex; align-items: center; gap: var(--sp-2); width: 100%; text-align: left; min-height: 44px; padding: 0 var(--sp-3);
+  border: var(--bd); border-radius: var(--r-sm); background: var(--glass-bg); color: var(--c-ink); font-weight: 600; font-size: var(--fs-sm); cursor: pointer; }
+.move-row:hover { background: var(--glass-bg-2); }
+.move-row span:nth-child(2) { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.move-row-go { color: var(--c-ink-soft); font-size: var(--fs-lg); }
+.move-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4); border-top: var(--bd); background: var(--glass-bg); }

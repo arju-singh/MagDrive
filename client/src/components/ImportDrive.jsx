@@ -18,7 +18,7 @@ const PROVIDER_BLURB = {
 
 // Connect a drive, browse its gallery, and IMPORT the selected photos/videos/PDFs
 // into the local library. Imported copies are permanent and independent of the source.
-export default function ImportDrive({ onImported, onClose }) {
+export default function ImportDrive({ onImported, onClose, folderId }) {
   const [conns, setConns] = useState([]);
   const [available, setAvailable] = useState([]);
   const [source, setSource] = useState('');      // active connected cloud provider
@@ -74,7 +74,7 @@ export default function ImportDrive({ onImported, onClose }) {
     if (!chosen.length) return;
     setImporting(true); setErr('');
     try {
-      const r = await api.cloudImport(source, chosen.map(({ id, name, mime, kind: k }) => ({ id, name, mime, kind: k })));
+      const r = await api.cloudImport(source, chosen.map(({ id, name, mime, kind: k }) => ({ id, name, mime, kind: k })), folderId);
       onImported?.(r.files || []);
       setDone({ imported: r.imported || 0, failed: (r.failed || []).length });
       setSel({});
