@@ -28,27 +28,27 @@ function normalizeItems(input) {
 }
 
 // GET /api/shelves
-router.get('/', requireAuth, (req, res) => {
-  const rows = db.prepare('SELECT * FROM shelves WHERE user_id = ? ORDER BY position, created_at').all(req.user.id);
+router.get('/', requireAuth, async (req, res) => {
+  const rows = await db.all('SELECT * FROM shelves WHERE user_id = ? ORDER BY position, created_at', [req.user.id]);
   res.json({ shelves: rows.map(serialize) });
 });
 
 // POST /api/shelves { title }
-router.post('/', requireAuth, (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   const userId = req.user.id;
   const title = String(req.body?.title || '').trim().slice(0, 120) || 'New shelf';
-  const max = db.prepare('SELECT COALESCE(MAX(position), -1) AS m FROM shelves WHERE user_id = ?').get(userId).m;
+  const max = (await db.get('SELECT COALESCE(MAX(position), -1) AS m FROM shelves WHERE user_id = ?', [userId])).m;
   const now = new Date().toISOString();
   const s = { id: randomUUID(), user_id: userId, title, position: max + 1, items_json: '[]', created_at: now, updated_at: now };
-  db.prepare(`INSERT INTO shelves (id, user_id, title, position, items_json, created_at, updated_at)
-              VALUES (@id, @user_id, @title, @position, @items_json, @created_at, @updated_at)`).run(s);
+  await db.run(`INSERT INTO shelves (id, user_id, title, position, items_json, created_at, updated_at)
+              VALUES (@id, @user_id, @title, @position, @items_json, @created_at, @updated_at)`, s);
   res.status(201).json({ shelf: serialize(s) });
 });
 
 // PATCH /api/shelves/:id { title?, position?, items? }
-router.patch('/:id', requireAuth, (req, res) => {
+router.patch('/:id', requireAuth, async (req, res) => {
   const userId = req.user.id;
-  const shelf = db.prepare('SELECT * FROM shelves WHERE id = ? AND user_id = ?').get(req.params.id, userId);
+  const shelf = await db.get('SELECT * FROM shelves WHERE id = ? AND user_id = ?', [req.params.id, userId]);
   if (!shelf) return res.status(404).json({ error: 'not_found' });
 
   const sets = [];
@@ -70,13 +70,13 @@ router.patch('/:id', requireAuth, (req, res) => {
   if (!sets.length) return res.status(400).json({ error: 'nothing_to_update' });
 
   sets.push('updated_at = @updated_at');
-  db.prepare(`UPDATE shelves SET ${sets.join(', ')} WHERE id = @id AND user_id = @userId`).run(params);
-  res.json({ shelf: serialize(db.prepare('SELECT * FROM shelves WHERE id = ?').get(shelf.id)) });
+  await db.run(`UPDATE shelves SET ${sets.join(', ')} WHERE id = @id AND user_id = @userId`, params);
+  res.json({ shelf: serialize(await db.get('SELECT * FROM shelves WHERE id = ?', [shelf.id])) });
 });
 
 // DELETE /api/shelves/:id
-router.delete('/:id', requireAuth, (req, res) => {
-  const r = db.prepare('DELETE FROM shelves WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
+router.delete('/:id', requireAuth, async (req, res) => {
+  const r = await db.run('DELETE FROM shelves WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
   if (!r.changes) return res.status(404).json({ error: 'not_found' });
   res.json({ ok: true });
 });

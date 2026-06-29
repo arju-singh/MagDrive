@@ -44,13 +44,13 @@ export function serialize(f) {
 }
 
 // Verify a folder belongs to the user (deny cross-user moves).
-function ownsFolder(userId, folderId) {
+async function ownsFolder(userId, folderId) {
   if (!folderId) return true;
-  return !!db.prepare('SELECT 1 FROM folders WHERE id = ? AND user_id = ?').get(folderId, userId);
+  return !!(await db.get('SELECT 1 FROM folders WHERE id = ? AND user_id = ?', [folderId, userId]));
 }
 
 // GET /api/files — list (paginated, filtered), always scoped to the caller.
-router.get('/', requireAuth, (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   const userId = req.user.id;
   const limit = Math.min(Number(req.query.limit) || 60, 200);
   const offset = Math.max(Number(req.query.offset) || 0, 0);
@@ -77,10 +77,11 @@ router.get('/', requireAuth, (req, res) => {
   }
 
   const clause = where.join(' AND ');
-  const rows = db
-    .prepare(`SELECT * FROM files WHERE ${clause} ORDER BY created_at DESC LIMIT @limit OFFSET @offset`)
-    .all({ ...filter, limit, offset });
-  const total = db.prepare(`SELECT COUNT(*) AS c FROM files WHERE ${clause}`).get(filter).c;
+  const rows = await db.all(
+    `SELECT * FROM files WHERE ${clause} ORDER BY created_at DESC LIMIT @limit OFFSET @offset`,
+    { ...filter, limit, offset }
+  );
+  const total = (await db.get(`SELECT COUNT(*) AS c FROM files WHERE ${clause}`, filter)).c;
 
   res.json({ files: rows.map(serialize), total, limit, offset });
 });
@@ -90,7 +91,7 @@ router.post('/', requireAuth, upload.array('files', 50), async (req, res) => {
   const userId = req.user.id;
   const folderId = req.body?.folderId && req.body.folderId !== 'root' ? req.body.folderId : null;
 
-  if (folderId && !ownsFolder(userId, folderId)) {
+  if (folderId && !(await ownsFolder(userId, folderId))) {
     // Clean temp parts before bailing.
     for (const f of req.files || []) fs.promises.unlink(f.path).catch(() => {});
     return res.status(403).json({ error: 'forbidden_folder' });
@@ -98,10 +99,6 @@ router.post('/', requireAuth, upload.array('files', 50), async (req, res) => {
   if (!req.files?.length) return res.status(400).json({ error: 'no_files' });
 
   const now = new Date().toISOString();
-  const insert = db.prepare(`
-    INSERT INTO files (id, user_id, folder_id, name, original_name, mime, size, kind, storage_key, starred, created_at, updated_at)
-    VALUES (@id, @user_id, @folder_id, @name, @original_name, @mime, @size, @kind, @storage_key, 0, @created_at, @updated_at)
-  `);
 
   const created = [];
   const failed = [];
@@ -133,7 +130,10 @@ router.post('/', requireAuth, upload.array('files', 50), async (req, res) => {
       created_at: now,
       updated_at: now,
     };
-    insert.run(row);
+    await db.run(`
+      INSERT INTO files (id, user_id, folder_id, name, original_name, mime, size, kind, storage_key, starred, created_at, updated_at)
+      VALUES (@id, @user_id, @folder_id, @name, @original_name, @mime, @size, @kind, @storage_key, 0, @created_at, @updated_at)
+    `, row);
     created.push(serialize(row));
     // Pre-generate the thumbnail in the background (non-blocking). The response is
     // sent immediately; the lazy /thumb endpoint still works if this hasn't finished.
@@ -154,13 +154,13 @@ router.post('/', requireAuth, upload.array('files', 50), async (req, res) => {
   res.status(201).json({ files: created, ...(failed.length ? { failed: failed.map((f) => f.name) } : {}) });
 });
 
-function getOwnedFile(userId, id) {
-  return db.prepare('SELECT * FROM files WHERE id = ? AND user_id = ?').get(id, userId);
+async function getOwnedFile(userId, id) {
+  return db.get('SELECT * FROM files WHERE id = ? AND user_id = ?', [id, userId]);
 }
 
 // GET /api/files/:id — metadata
-router.get('/:id', requireAuth, (req, res) => {
-  const f = getOwnedFile(req.user.id, req.params.id);
+router.get('/:id', requireAuth, async (req, res) => {
+  const f = await getOwnedFile(req.user.id, req.params.id);
   if (!f) return res.status(404).json({ error: 'not_found' });
   res.json({ file: serialize(f) });
 });
@@ -200,8 +200,8 @@ function streamFile(f, req, res, { download } = {}) {
 }
 
 // GET /api/files/:id/raw — inline (img/video/pdf). Flexible auth (?token=) for media tags.
-router.get('/:id/raw', requireAuthFlexible, (req, res) => {
-  const f = getOwnedFile(req.user.id, req.params.id);
+router.get('/:id/raw', requireAuthFlexible, async (req, res) => {
+  const f = await getOwnedFile(req.user.id, req.params.id);
   if (!f) return res.status(404).json({ error: 'not_found' });
   streamFile(f, req, res, { download: false });
 });
@@ -211,15 +211,15 @@ async function generateThumb(f) {
   try {
     const buf = await makeThumb(f.kind, src);
     if (!buf) {
-      db.prepare("UPDATE files SET thumb_status = 'unsupported' WHERE id = ?").run(f.id);
+      await db.run("UPDATE files SET thumb_status = 'unsupported' WHERE id = ?", [f.id]);
       return;
     }
     const key = `thumbs/${f.user_id}/${f.id}.jpg`;
     await storage.putBuffer(key, buf);
-    db.prepare("UPDATE files SET thumb_key = ?, thumb_status = 'ready' WHERE id = ?").run(key, f.id);
+    await db.run("UPDATE files SET thumb_key = ?, thumb_status = 'ready' WHERE id = ?", [key, f.id]);
   } catch (e) {
     logger.warn('thumb generation failed', { kind: f.kind, code: e.code, msg: e.message });
-    db.prepare("UPDATE files SET thumb_status = 'failed' WHERE id = ?").run(f.id);
+    await db.run("UPDATE files SET thumb_status = 'failed' WHERE id = ?", [f.id]);
   } finally {
     await cleanup();
   }
@@ -268,7 +268,7 @@ async function sendThumb(f, res) {
 
 // GET /api/files/:id/thumb — cached JPEG thumbnail; generated lazily on first view.
 router.get('/:id/thumb', requireAuthFlexible, async (req, res) => {
-  const f = getOwnedFile(req.user.id, req.params.id);
+  const f = await getOwnedFile(req.user.id, req.params.id);
   if (!f) return res.status(404).json({ error: 'not_found' });
 
   if (f.thumb_status === 'ready' && f.thumb_key) return sendThumb(f, res);
@@ -279,22 +279,22 @@ router.get('/:id/thumb', requireAuthFlexible, async (req, res) => {
   // status 'none' → fallback path if pre-generation hasn't finished yet (or is disabled).
   await scheduleThumb(f);
 
-  const nf = getOwnedFile(req.user.id, f.id);
+  const nf = await getOwnedFile(req.user.id, f.id);
   if (nf?.thumb_status === 'ready' && nf.thumb_key) return sendThumb(nf, res);
   return res.status(404).json({ error: 'no_thumb' });
 });
 
 // GET /api/files/:id/download — attachment
-router.get('/:id/download', requireAuthFlexible, (req, res) => {
-  const f = getOwnedFile(req.user.id, req.params.id);
+router.get('/:id/download', requireAuthFlexible, async (req, res) => {
+  const f = await getOwnedFile(req.user.id, req.params.id);
   if (!f) return res.status(404).json({ error: 'not_found' });
   streamFile(f, req, res, { download: true });
 });
 
 // PATCH /api/files/:id — rename / move / star
-router.patch('/:id', requireAuth, (req, res) => {
+router.patch('/:id', requireAuth, async (req, res) => {
   const userId = req.user.id;
-  const f = getOwnedFile(userId, req.params.id);
+  const f = await getOwnedFile(userId, req.params.id);
   if (!f) return res.status(404).json({ error: 'not_found' });
 
   const sets = [];
@@ -308,7 +308,7 @@ router.patch('/:id', requireAuth, (req, res) => {
   }
   if ('folderId' in (req.body || {})) {
     const folderId = req.body.folderId && req.body.folderId !== 'root' ? req.body.folderId : null;
-    if (!ownsFolder(userId, folderId)) return res.status(403).json({ error: 'forbidden_folder' });
+    if (!(await ownsFolder(userId, folderId))) return res.status(403).json({ error: 'forbidden_folder' });
     sets.push('folder_id = @folderId');
     params.folderId = folderId;
   }
@@ -319,18 +319,18 @@ router.patch('/:id', requireAuth, (req, res) => {
   if (!sets.length) return res.status(400).json({ error: 'nothing_to_update' });
 
   sets.push('updated_at = @updated_at');
-  db.prepare(`UPDATE files SET ${sets.join(', ')} WHERE id = @id AND user_id = @userId`).run(params);
-  res.json({ file: serialize(getOwnedFile(userId, f.id)) });
+  await db.run(`UPDATE files SET ${sets.join(', ')} WHERE id = @id AND user_id = @userId`, params);
+  res.json({ file: serialize(await getOwnedFile(userId, f.id)) });
 });
 
 // DELETE /api/files/:id — remove storage object + row (right-to-delete; Checklist: Data/Security)
 router.delete('/:id', requireAuth, async (req, res) => {
   const userId = req.user.id;
-  const f = getOwnedFile(userId, req.params.id);
+  const f = await getOwnedFile(userId, req.params.id);
   if (!f) return res.status(404).json({ error: 'not_found' });
   await storage.remove(f.storage_key);
   if (f.thumb_key) await storage.remove(f.thumb_key);
-  db.prepare('DELETE FROM files WHERE id = ? AND user_id = ?').run(f.id, userId);
+  await db.run('DELETE FROM files WHERE id = ? AND user_id = ?', [f.id, userId]);
   logger.info('file deleted', { userId, fileId: f.id });
   res.json({ ok: true });
 });

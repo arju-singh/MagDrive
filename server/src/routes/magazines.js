@@ -30,7 +30,7 @@ function serialize(m) {
 }
 
 // Validate that any file referenced in the layout/cover belongs to the user.
-function validateRefs(userId, layout, coverFileId) {
+async function validateRefs(userId, layout, coverFileId) {
   const ids = new Set();
   if (coverFileId) ids.add(coverFileId);
   for (const b of layout?.blocks || []) {
@@ -38,7 +38,7 @@ function validateRefs(userId, layout, coverFileId) {
     for (const fid of b?.fileIds || []) ids.add(fid);
   }
   for (const id of ids) {
-    const ok = db.prepare('SELECT 1 FROM files WHERE id = ? AND user_id = ?').get(id, userId);
+    const ok = await db.get('SELECT 1 FROM files WHERE id = ? AND user_id = ?', [id, userId]);
     if (!ok) return false;
   }
   return true;
@@ -62,29 +62,27 @@ function normalizeLayout(input) {
 }
 
 // GET /api/magazines — list
-router.get('/', requireAuth, (req, res) => {
-  const rows = db
-    .prepare('SELECT * FROM magazines WHERE user_id = ? ORDER BY updated_at DESC')
-    .all(req.user.id);
+router.get('/', requireAuth, async (req, res) => {
+  const rows = await db.all('SELECT * FROM magazines WHERE user_id = ? ORDER BY updated_at DESC', [req.user.id]);
   res.json({ magazines: rows.map(serialize) });
 });
 
 // GET /api/magazines/:id
-router.get('/:id', requireAuth, (req, res) => {
-  const m = db.prepare('SELECT * FROM magazines WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+router.get('/:id', requireAuth, async (req, res) => {
+  const m = await db.get('SELECT * FROM magazines WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
   if (!m) return res.status(404).json({ error: 'not_found' });
   res.json({ magazine: serialize(m) });
 });
 
 // POST /api/magazines — { title, theme?, layout? }
-router.post('/', requireAuth, (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   const userId = req.user.id;
   const title = String(req.body?.title || '').trim().slice(0, 160) || 'Untitled Magazine';
   const theme = THEMES.includes(req.body?.theme) ? req.body.theme : 'editorial';
   const layout = normalizeLayout(req.body?.layout);
   const coverFileId = typeof req.body?.coverFileId === 'string' ? req.body.coverFileId : null;
 
-  if (!validateRefs(userId, layout, coverFileId)) return res.status(403).json({ error: 'forbidden_file_ref' });
+  if (!(await validateRefs(userId, layout, coverFileId))) return res.status(403).json({ error: 'forbidden_file_ref' });
   const layoutJson = JSON.stringify(layout);
   if (layoutJson.length > MAX_LAYOUT_BYTES) return res.status(413).json({ error: 'layout_too_large' });
 
@@ -99,15 +97,15 @@ router.post('/', requireAuth, (req, res) => {
     created_at: now,
     updated_at: now,
   };
-  db.prepare(`INSERT INTO magazines (id, user_id, title, theme, cover_file_id, layout_json, created_at, updated_at)
-              VALUES (@id, @user_id, @title, @theme, @cover_file_id, @layout_json, @created_at, @updated_at)`).run(m);
+  await db.run(`INSERT INTO magazines (id, user_id, title, theme, cover_file_id, layout_json, created_at, updated_at)
+              VALUES (@id, @user_id, @title, @theme, @cover_file_id, @layout_json, @created_at, @updated_at)`, m);
   res.status(201).json({ magazine: serialize(m) });
 });
 
 // PATCH /api/magazines/:id — update title/theme/cover/layout
-router.patch('/:id', requireAuth, (req, res) => {
+router.patch('/:id', requireAuth, async (req, res) => {
   const userId = req.user.id;
-  const m = db.prepare('SELECT * FROM magazines WHERE id = ? AND user_id = ?').get(req.params.id, userId);
+  const m = await db.get('SELECT * FROM magazines WHERE id = ? AND user_id = ?', [req.params.id, userId]);
   if (!m) return res.status(404).json({ error: 'not_found' });
 
   const sets = [];
@@ -123,33 +121,33 @@ router.patch('/:id', requireAuth, (req, res) => {
   }
   if ('coverFileId' in (req.body || {})) {
     const coverFileId = typeof req.body.coverFileId === 'string' ? req.body.coverFileId : null;
-    if (coverFileId && !db.prepare('SELECT 1 FROM files WHERE id = ? AND user_id = ?').get(coverFileId, userId))
+    if (coverFileId && !(await db.get('SELECT 1 FROM files WHERE id = ? AND user_id = ?', [coverFileId, userId])))
       return res.status(403).json({ error: 'forbidden_file_ref' });
     sets.push('cover_file_id = @coverFileId');
     params.coverFileId = coverFileId;
   }
   if ('layout' in (req.body || {})) {
     const layout = normalizeLayout(req.body.layout);
-    if (!validateRefs(userId, layout, null)) return res.status(403).json({ error: 'forbidden_file_ref' });
+    if (!(await validateRefs(userId, layout, null))) return res.status(403).json({ error: 'forbidden_file_ref' });
     const layoutJson = JSON.stringify(layout);
     if (layoutJson.length > MAX_LAYOUT_BYTES) return res.status(413).json({ error: 'layout_too_large' });
     sets.push('layout_json = @layoutJson');
     params.layoutJson = layoutJson;
   }
-  if (sets.length === 1) return res.status(400).json({ error: 'nothing_to_update' }); // only updated_at
+  if (sets.length === 0) return res.status(400).json({ error: 'nothing_to_update' }); // no real fields
 
   sets.push('updated_at = @updated_at');
-  db.prepare(`UPDATE magazines SET ${sets.join(', ')} WHERE id = @id AND user_id = @userId`).run(params);
-  const updated = db.prepare('SELECT * FROM magazines WHERE id = ?').get(m.id);
+  await db.run(`UPDATE magazines SET ${sets.join(', ')} WHERE id = @id AND user_id = @userId`, params);
+  const updated = await db.get('SELECT * FROM magazines WHERE id = ?', [m.id]);
   res.json({ magazine: serialize(updated) });
 });
 
 // DELETE /api/magazines/:id
-router.delete('/:id', requireAuth, (req, res) => {
+router.delete('/:id', requireAuth, async (req, res) => {
   const userId = req.user.id;
-  const m = db.prepare('SELECT * FROM magazines WHERE id = ? AND user_id = ?').get(req.params.id, userId);
+  const m = await db.get('SELECT * FROM magazines WHERE id = ? AND user_id = ?', [req.params.id, userId]);
   if (!m) return res.status(404).json({ error: 'not_found' });
-  db.prepare('DELETE FROM magazines WHERE id = ? AND user_id = ?').run(m.id, userId);
+  await db.run('DELETE FROM magazines WHERE id = ? AND user_id = ?', [m.id, userId]);
   res.json({ ok: true });
 });
 

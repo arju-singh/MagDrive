@@ -12,7 +12,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const VALID_KINDS = new Set(['contact', 'bug']);
 
 // POST /api/feedback — contact/support message or bug report. Anonymous-friendly.
-router.post('/', optionalAuth, rateLimit({ bucket: 'feedback', windowMs: 60_000, max: 5 }), (req, res) => {
+router.post('/', optionalAuth, rateLimit({ bucket: 'feedback', windowMs: 60_000, max: 5 }), async (req, res) => {
   const kind = VALID_KINDS.has(req.body?.kind) ? req.body.kind : 'contact';
   const message = String(req.body?.message || '').trim().slice(0, 5000);
   if (message.length < 3) return res.status(400).json({ error: 'message_required' });
@@ -23,10 +23,11 @@ router.post('/', optionalAuth, rateLimit({ bucket: 'feedback', windowMs: 60_000,
   let meta = '{}';
   try { meta = JSON.stringify(req.body?.meta || {}).slice(0, 2000); } catch { /* keep {} */ }
 
-  db.prepare(
+  await db.run(
     `INSERT INTO feedback (id, user_id, kind, email, message, meta_json, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  ).run(randomUUID(), req.user?.id || null, kind, email || null, message, meta, new Date().toISOString());
+    [randomUUID(), req.user?.id || null, kind, email || null, message, meta, new Date().toISOString()],
+  );
 
   // Best-effort notification to the support inbox (no-op if SMTP unconfigured).
   sendFeedbackNotification({ kind, fromEmail: email, message, meta: req.body?.meta }).catch(() => {});

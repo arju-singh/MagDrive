@@ -15,7 +15,7 @@ import billingRouter, { handleWebhook } from './routes/billing.js';
 import analyticsRouter from './routes/analytics.js';
 import feedbackRouter from './routes/feedback.js';
 
-migrate();
+await migrate();
 
 const app = express();
 app.disable('x-powered-by');

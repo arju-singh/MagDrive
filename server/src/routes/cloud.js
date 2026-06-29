@@ -19,13 +19,13 @@ const router = express.Router();
 const TMP_DIR = path.join(SERVER_ROOT, 'data', 'tmp');
 fs.mkdirSync(TMP_DIR, { recursive: true });
 
-function getConn(userId, providerKey) {
-  return db.prepare('SELECT * FROM connections WHERE user_id = ? AND provider = ?').get(userId, providerKey);
+async function getConn(userId, providerKey) {
+  return db.get('SELECT * FROM connections WHERE user_id = ? AND provider = ?', [userId, providerKey]);
 }
 
-function ownsFolder(userId, folderId) {
+async function ownsFolder(userId, folderId) {
   if (!folderId) return true;
-  return !!db.prepare('SELECT 1 FROM folders WHERE id = ? AND user_id = ?').get(folderId, userId);
+  return !!(await db.get('SELECT 1 FROM folders WHERE id = ? AND user_id = ?', [folderId, userId]));
 }
 
 // Turn a provider.media() result into a fetch Response we can stream from.
@@ -49,7 +49,7 @@ async function openCloudStream(provider, conn, fileId) {
 router.get('/:provider/files', requireAuth, async (req, res) => {
   const provider = getProvider(req.params.provider);
   if (!provider) return res.status(404).json({ error: 'provider_unavailable' });
-  const conn = getConn(req.user.id, provider.key);
+  const conn = await getConn(req.user.id, provider.key);
   if (!conn) return res.status(409).json({ error: 'not_connected' });
 
   try {
@@ -82,7 +82,7 @@ function pipeUpstream(upstream, res, { fallbackType } = {}) {
 router.get('/:provider/files/:id/raw', requireAuthFlexible, async (req, res) => {
   const provider = getProvider(req.params.provider);
   if (!provider) return res.status(404).end();
-  const conn = getConn(req.user.id, provider.key);
+  const conn = await getConn(req.user.id, provider.key);
   if (!conn) return res.status(409).end();
   try {
     const r = await provider.media({ conn, fileId: req.params.id, range: req.headers.range });
@@ -99,7 +99,7 @@ router.get('/:provider/files/:id/raw', requireAuthFlexible, async (req, res) => 
 router.get('/:provider/files/:id/thumb', requireAuthFlexible, async (req, res) => {
   const provider = getProvider(req.params.provider);
   if (!provider) return res.status(404).end();
-  const conn = getConn(req.user.id, provider.key);
+  const conn = await getConn(req.user.id, provider.key);
   if (!conn) return res.status(409).end();
   try {
     const r = await provider.thumb({ conn, fileId: req.params.id });
@@ -121,19 +121,19 @@ router.post('/:provider/import', requireAuth, async (req, res) => {
   const userId = req.user.id;
   const provider = getProvider(req.params.provider);
   if (!provider) return res.status(404).json({ error: 'provider_unavailable' });
-  const conn = getConn(userId, provider.key);
+  const conn = await getConn(userId, provider.key);
   if (!conn) return res.status(409).json({ error: 'not_connected' });
 
   const items = Array.isArray(req.body?.items) ? req.body.items.slice(0, 100) : [];
   if (!items.length) return res.status(400).json({ error: 'no_items' });
   const folderId = req.body?.folderId && req.body.folderId !== 'root' ? req.body.folderId : null;
-  if (folderId && !ownsFolder(userId, folderId)) return res.status(403).json({ error: 'forbidden_folder' });
+  if (folderId && !(await ownsFolder(userId, folderId))) return res.status(403).json({ error: 'forbidden_folder' });
 
   const now = new Date().toISOString();
-  const insert = db.prepare(`
+  const insertSql = `
     INSERT INTO files (id, user_id, folder_id, name, original_name, mime, size, kind, storage_key, starred, created_at, updated_at)
     VALUES (@id, @user_id, @folder_id, @name, @original_name, @mime, @size, @kind, @storage_key, 0, @created_at, @updated_at)
-  `);
+  `;
 
   const created = [];
   const failed = [];
@@ -168,7 +168,7 @@ router.post('/:provider/import', requireAuth, async (req, res) => {
         size: bytes, kind: item?.kind || kindFromMime(mime),
         storage_key: key, created_at: now, updated_at: now,
       };
-      insert.run(row);
+      await db.run(insertSql, row);
       created.push(serialize(row));
       scheduleThumb(row); // background thumbnail, same as uploads
     } catch (e) {

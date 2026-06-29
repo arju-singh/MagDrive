@@ -12,11 +12,11 @@ import { kindFromMime } from './kinds.js';
 //   thumb({ conn, fileId })         -> { redirect } | { upstream: Response } | { status }
 
 // ---------- token persistence + refresh ----------
-function persistTokens(connId, { accessToken, refreshToken, expiresAt }) {
+async function persistTokens(connId, { accessToken, refreshToken, expiresAt }) {
   const sets = ['access_token = @access', 'expires_at = @exp'];
   const params = { id: connId, access: accessToken, exp: expiresAt ?? null };
   if (refreshToken) { sets.push('refresh_token = @refresh'); params.refresh = refreshToken; }
-  db.prepare(`UPDATE connections SET ${sets.join(', ')} WHERE id = @id`).run(params);
+  await db.run(`UPDATE connections SET ${sets.join(', ')} WHERE id = @id`, params);
 }
 
 // =====================================================================
@@ -92,7 +92,7 @@ async function googleEnsureToken(conn) {
   const j = await res.json();
   const access = j.access_token;
   const exp = Date.now() + (j.expires_in || 3500) * 1000;
-  persistTokens(conn.id, { accessToken: access, expiresAt: exp });
+  await persistTokens(conn.id, { accessToken: access, expiresAt: exp });
   return access;
 }
 
@@ -186,7 +186,7 @@ async function dropboxEnsureToken(conn) {
   if (!res.ok) throw new Error(`dropbox refresh ${res.status}`);
   const j = await res.json();
   const exp = Date.now() + (j.expires_in || 14000) * 1000;
-  persistTokens(conn.id, { accessToken: j.access_token, expiresAt: exp });
+  await persistTokens(conn.id, { accessToken: j.access_token, expiresAt: exp });
   return j.access_token;
 }
 

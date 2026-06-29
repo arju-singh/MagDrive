@@ -30,20 +30,21 @@ function publicUser(u) {
 }
 
 // ---- single-use, hashed, expiring tokens (verify | reset) ----
-function createEmailToken(userId, type, ttlMs) {
+async function createEmailToken(userId, type, ttlMs) {
   const raw = randomBytes(32).toString('hex');
   const tokenHash = createHash('sha256').update(raw).digest('hex');
-  db.prepare(
+  await db.run(
     'INSERT INTO email_tokens (id, user_id, type, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-  ).run(randomUUID(), userId, type, tokenHash, Date.now() + ttlMs, new Date().toISOString());
+    [randomUUID(), userId, type, tokenHash, Date.now() + ttlMs, new Date().toISOString()],
+  );
   return raw;
 }
 
-function consumeEmailToken(raw, type) {
+async function consumeEmailToken(raw, type) {
   const tokenHash = createHash('sha256').update(String(raw || '')).digest('hex');
-  const row = db.prepare('SELECT * FROM email_tokens WHERE token_hash = ? AND type = ?').get(tokenHash, type);
+  const row = await db.get('SELECT * FROM email_tokens WHERE token_hash = ? AND type = ?', [tokenHash, type]);
   if (!row || row.used_at || row.expires_at < Date.now()) return null;
-  db.prepare('UPDATE email_tokens SET used_at = ? WHERE id = ?').run(new Date().toISOString(), row.id);
+  await db.run('UPDATE email_tokens SET used_at = ? WHERE id = ?', [new Date().toISOString(), row.id]);
   return row;
 }
 
@@ -122,7 +123,7 @@ authRouter.post('/register', rateLimit({ bucket: 'register', windowMs: 60_000, m
   if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'invalid_email' });
   if (password.length < 8) return res.status(400).json({ error: 'weak_password', message: 'Password must be at least 8 characters.' });
 
-  const exists = db.prepare('SELECT 1 FROM users WHERE email = ?').get(email);
+  const exists = await db.get('SELECT 1 FROM users WHERE email = ?', [email]);
   if (exists) return res.status(409).json({ error: 'email_taken' });
 
   const hash = await bcrypt.hash(password, 10);
@@ -133,12 +134,13 @@ authRouter.post('/register', rateLimit({ bucket: 'register', windowMs: 60_000, m
     name: name || email.split('@')[0],
     created_at: new Date().toISOString(),
   };
-  db.prepare(
+  await db.run(
     'INSERT INTO users (id, email, password_hash, name, created_at) VALUES (?, ?, ?, ?, ?)',
-  ).run(user.id, user.email, user.password_hash, user.name, user.created_at);
+    [user.id, user.email, user.password_hash, user.name, user.created_at],
+  );
 
   // Fire-and-forget verification email (best-effort; never blocks signup).
-  const raw = createEmailToken(user.id, 'verify', VERIFY_TTL_MS);
+  const raw = await createEmailToken(user.id, 'verify', VERIFY_TTL_MS);
   sendVerificationEmail(user.email, verifyLink(raw)).catch(() => {});
 
   logger.info('user registered', { userId: user.id });
@@ -149,7 +151,7 @@ authRouter.post('/login', rateLimit({ bucket: 'login', windowMs: 60_000, max: 10
   const email = String(req.body?.email || '').trim().toLowerCase();
   const password = String(req.body?.password || '');
 
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+  const user = await db.get('SELECT * FROM users WHERE email = ?', [email]);
   // Same response shape/time-ish for missing user vs bad password (no user enumeration).
   if (!user || !user.password_hash || !(await bcrypt.compare(password, user.password_hash))) {
     return res.status(401).json({ error: 'invalid_credentials' });
@@ -157,39 +159,39 @@ authRouter.post('/login', rateLimit({ bucket: 'login', windowMs: 60_000, max: 10
   return res.json({ token: sign(user), user: publicUser(user) });
 });
 
-authRouter.get('/me', requireAuth, (req, res) => {
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+authRouter.get('/me', requireAuth, async (req, res) => {
+  const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.id]);
   if (!user) return res.status(404).json({ error: 'not_found' });
   return res.json({ user: publicUser(user) });
 });
 
 // ---- email verification ----
-authRouter.post('/verify/request', requireAuth, rateLimit({ bucket: 'verify', windowMs: 60_000, max: 5 }), (req, res) => {
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+authRouter.post('/verify/request', requireAuth, rateLimit({ bucket: 'verify', windowMs: 60_000, max: 5 }), async (req, res) => {
+  const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.id]);
   if (!user) return res.status(404).json({ error: 'not_found' });
   if (user.email_verified) return res.json({ ok: true, alreadyVerified: true });
-  const raw = createEmailToken(user.id, 'verify', VERIFY_TTL_MS);
+  const raw = await createEmailToken(user.id, 'verify', VERIFY_TTL_MS);
   sendVerificationEmail(user.email, verifyLink(raw)).catch(() => {});
   return res.json({ ok: true });
 });
 
-authRouter.get('/verify', (req, res) => {
-  const row = consumeEmailToken(req.query.token, 'verify');
+authRouter.get('/verify', async (req, res) => {
+  const row = await consumeEmailToken(req.query.token, 'verify');
   const bounce = (status) => res.redirect(`${config.clientUrl}/?verified=${status}`);
   if (!row) return bounce('invalid');
-  db.prepare('UPDATE users SET email_verified = 1 WHERE id = ?').run(row.user_id);
+  await db.run('UPDATE users SET email_verified = 1 WHERE id = ?', [row.user_id]);
   logger.info('email verified', { userId: row.user_id });
   return bounce('1');
 });
 
 // ---- password reset ----
-authRouter.post('/password/forgot', rateLimit({ bucket: 'forgot', windowMs: 60_000, max: 5 }), (req, res) => {
+authRouter.post('/password/forgot', rateLimit({ bucket: 'forgot', windowMs: 60_000, max: 5 }), async (req, res) => {
   const email = String(req.body?.email || '').trim().toLowerCase();
   // Always 200 — never reveal whether the address exists (no user enumeration).
   if (EMAIL_RE.test(email)) {
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    const user = await db.get('SELECT * FROM users WHERE email = ?', [email]);
     if (user) {
-      const raw = createEmailToken(user.id, 'reset', RESET_TTL_MS);
+      const raw = await createEmailToken(user.id, 'reset', RESET_TTL_MS);
       sendPasswordResetEmail(user.email, resetLink(raw)).catch(() => {});
     }
   }
@@ -200,10 +202,10 @@ authRouter.post('/password/reset', rateLimit({ bucket: 'reset', windowMs: 60_000
   const token = String(req.body?.token || '');
   const password = String(req.body?.password || '');
   if (password.length < 8) return res.status(400).json({ error: 'weak_password', message: 'Password must be at least 8 characters.' });
-  const row = consumeEmailToken(token, 'reset');
+  const row = await consumeEmailToken(token, 'reset');
   if (!row) return res.status(400).json({ error: 'invalid_token' });
   const hash = await bcrypt.hash(password, 10);
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, row.user_id);
+  await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [hash, row.user_id]);
   logger.info('password reset', { userId: row.user_id });
   return res.json({ ok: true });
 });
@@ -251,7 +253,7 @@ authRouter.get('/google/callback', async (req, res) => {
     });
     if (!uiRes.ok) throw new Error(`userinfo ${uiRes.status}`);
     const profile = await uiRes.json(); // { id, email, name, ... }
-    const user = upsertGoogleUser(profile);
+    const user = await upsertGoogleUser(profile);
     logger.info('google sign-in', { userId: user.id });
     return res.redirect(`${config.clientUrl}/auth/callback#token=${sign(user)}`);
   } catch (e) {
@@ -261,17 +263,18 @@ authRouter.get('/google/callback', async (req, res) => {
 });
 
 // Find-or-create a user from a Google profile, linking via auth_identities.
-function upsertGoogleUser(profile) {
+async function upsertGoogleUser(profile) {
   const providerUserId = String(profile.id);
   const email = String(profile.email || '').trim().toLowerCase();
 
-  const ident = db.prepare(
+  const ident = await db.get(
     'SELECT user_id FROM auth_identities WHERE provider = ? AND provider_user_id = ?',
-  ).get('google', providerUserId);
-  if (ident) return db.prepare('SELECT * FROM users WHERE id = ?').get(ident.user_id);
+    ['google', providerUserId],
+  );
+  if (ident) return db.get('SELECT * FROM users WHERE id = ?', [ident.user_id]);
 
   // Link to an existing account with the same (Google-verified) email, else create one.
-  let user = email ? db.prepare('SELECT * FROM users WHERE email = ?').get(email) : null;
+  let user = email ? await db.get('SELECT * FROM users WHERE email = ?', [email]) : null;
   if (!user) {
     user = {
       id: randomUUID(),
@@ -280,12 +283,16 @@ function upsertGoogleUser(profile) {
       name: String(profile.name || email.split('@')[0] || 'User').slice(0, 80),
       created_at: new Date().toISOString(),
     };
-    db.prepare('INSERT INTO users (id, email, password_hash, name, created_at, email_verified) VALUES (?, ?, ?, ?, ?, 1)')
-      .run(user.id, user.email, user.password_hash, user.name, user.created_at);
+    await db.run(
+      'INSERT INTO users (id, email, password_hash, name, created_at, email_verified) VALUES (?, ?, ?, ?, ?, 1)',
+      [user.id, user.email, user.password_hash, user.name, user.created_at],
+    );
   } else if (!user.email_verified) {
-    db.prepare('UPDATE users SET email_verified = 1 WHERE id = ?').run(user.id);
+    await db.run('UPDATE users SET email_verified = 1 WHERE id = ?', [user.id]);
   }
-  db.prepare('INSERT INTO auth_identities (id, user_id, provider, provider_user_id, created_at) VALUES (?, ?, ?, ?, ?)')
-    .run(randomUUID(), user.id, 'google', providerUserId, new Date().toISOString());
-  return db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
+  await db.run(
+    'INSERT INTO auth_identities (id, user_id, provider, provider_user_id, created_at) VALUES (?, ?, ?, ?, ?)',
+    [randomUUID(), user.id, 'google', providerUserId, new Date().toISOString()],
+  );
+  return db.get('SELECT * FROM users WHERE id = ?', [user.id]);
 }
