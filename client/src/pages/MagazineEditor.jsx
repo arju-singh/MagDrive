@@ -50,21 +50,29 @@ export default function MagazineEditor() {
   const [picker, setPicker] = useState(null); // {target, multiple, kind}
   const [sharing, setSharing] = useState(false);
   const [shareConfirm, setShareConfirm] = useState(false); // unsaved-changes prompt
-  const loadedRef = useRef(false);
+  // Snapshot of the last loaded/saved state. `dirty` is "differs from this", which
+  // avoids false positives on load and clears if an edit is undone.
+  const baselineRef = useRef(null);
+  const snapshot = (t, th, cover, blks) => JSON.stringify({ t, th, cover, blks });
 
   useEffect(() => {
     api.getMagazine(id).then(({ magazine }) => {
+      const blks = magazine.layout.blocks.map((b) => ({ ...b }));
       setMag(magazine);
       setTitle(magazine.title);
       setTheme(magazine.theme);
       setCoverFileId(magazine.coverFileId);
-      setBlocks(magazine.layout.blocks.map((b) => ({ ...b })));
-      loadedRef.current = true;
+      setBlocks(blks);
+      baselineRef.current = snapshot(magazine.title, magazine.theme, magazine.coverFileId, blks);
+      setDirty(false);
     }).catch(() => nav('/magazines'));
   }, [id, nav]);
 
-  // Mark dirty on any edit after initial load.
-  useEffect(() => { if (loadedRef.current) setDirty(true); }, [title, theme, coverFileId, blocks]);
+  // Dirty = current form differs from the loaded/saved baseline (not just "edited").
+  useEffect(() => {
+    if (baselineRef.current == null) return; // not loaded yet
+    setDirty(snapshot(title, theme, coverFileId, blocks) !== baselineRef.current);
+  }, [title, theme, coverFileId, blocks]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 1800); };
 
@@ -73,6 +81,7 @@ export default function MagazineEditor() {
     try {
       const { magazine } = await api.patchMagazine(id, { title, theme, coverFileId, layout: { blocks } });
       setMag(magazine);
+      baselineRef.current = snapshot(title, theme, coverFileId, blocks); // new saved baseline
       setDirty(false);
       bump();
       showToast('Saved');
