@@ -49,6 +49,7 @@ export default function MagazineEditor() {
   const [toast, setToast] = useState('');
   const [picker, setPicker] = useState(null); // {target, multiple, kind}
   const [sharing, setSharing] = useState(false);
+  const [shareConfirm, setShareConfirm] = useState(false); // unsaved-changes prompt
   const loadedRef = useRef(false);
 
   useEffect(() => {
@@ -75,9 +76,21 @@ export default function MagazineEditor() {
       setDirty(false);
       bump();
       showToast('Saved');
+      return true;
     } catch (ex) {
       showToast(ex.status === 413 ? 'Magazine is too large to save.' : 'Save failed.');
+      return false;
     } finally { setSaving(false); }
+  }
+
+  // Share opens the link modal — but a public link reflects the last SAVED version,
+  // so prompt to save first when there are unsaved edits.
+  function onShareClick() {
+    if (dirty) setShareConfirm(true);
+    else setSharing(true);
+  }
+  async function saveThenShare() {
+    if (await save()) { setShareConfirm(false); setSharing(true); }
   }
 
   // block ops
@@ -109,7 +122,7 @@ export default function MagazineEditor() {
         <button className="btn btn--ghost" onClick={() => nav('/magazines')}>← Newsstand</button>
         <div className="spacer" style={{ flex: 1 }} />
         <span className="muted" style={{ fontSize: 13 }}>{dirty ? 'Unsaved changes' : 'All changes saved'}</span>
-        <button className="btn" onClick={() => setSharing(true)}>
+        <button className="btn" onClick={onShareClick}>
           <Icon name="share" size={15} /> Share
         </button>
         <button className="btn btn--primary" onClick={save} disabled={saving || !dirty}>
@@ -184,6 +197,28 @@ export default function MagazineEditor() {
           onClose={() => setPicker(null)}
         />
       )}
+      {shareConfirm && (
+        <div className="modal-back" onClick={() => setShareConfirm(false)}>
+          <div className="modal share-modal" onClick={(e) => e.stopPropagation()}>
+            <header>
+              <div className="name" style={{ flex: 1 }}>Unsaved changes</div>
+              <button className="btn btn--sm btn--ghost" onClick={() => setShareConfirm(false)} aria-label="Close">✕</button>
+            </header>
+            <div className="share-body">
+              <p className="muted">A public link always shows the last saved version. Save your changes first so people see your latest edits?</p>
+              <div className="row" style={{ gap: 'var(--sp-2)' }}>
+                <button className="btn btn--primary" onClick={saveThenShare} disabled={saving}>
+                  {saving ? <span className="spinner" /> : 'Save & share'}
+                </button>
+                <button className="btn" onClick={() => { setShareConfirm(false); setSharing(true); }} disabled={saving}>
+                  Share without saving
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {sharing && (
         <ShareModal target={{ type: 'magazine', id, title: title || 'Untitled Magazine' }} onClose={() => setSharing(false)} />
       )}
