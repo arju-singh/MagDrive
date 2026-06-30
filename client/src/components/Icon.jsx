@@ -32,6 +32,7 @@ const PATHS = {
   // Folders
   folder: '<path d="M3 7.5A2 2 0 0 1 5 5.5h3.7a2 2 0 0 1 1.4.6l1 1a2 2 0 0 0 1.4.6H19a2 2 0 0 1 2 2v7.3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   'folder-plus': '<path d="M3 7.5A2 2 0 0 1 5 5.5h3.7a2 2 0 0 1 1.4.6l1 1a2 2 0 0 0 1.4.6H19a2 2 0 0 1 2 2v7.3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11.8v4.4M9.8 14h4.4"/>',
+  share: '<circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="m8.3 10.7 7.4-4.4M8.3 13.3l7.4 4.4"/>',
 };
 
 const COMMON = {

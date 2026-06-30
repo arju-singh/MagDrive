@@ -14,6 +14,8 @@ import shelvesRouter from './routes/shelves.js';
 import billingRouter, { handleWebhook } from './routes/billing.js';
 import analyticsRouter from './routes/analytics.js';
 import feedbackRouter from './routes/feedback.js';
+import sharesRouter from './routes/shares.js';
+import publicRouter from './routes/public.js';
 
 await migrate();
 
@@ -41,6 +43,8 @@ app.use('/api/shelves', shelvesRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/feedback', feedbackRouter);
+app.use('/api/shares', sharesRouter);   // authed: create/revoke links
+app.use('/api/public', publicRouter);   // no auth: view shared files/magazines
 
 app.use((req, res) => res.status(404).json({ error: 'not_found' }));
 

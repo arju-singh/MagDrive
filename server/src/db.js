@@ -159,6 +159,10 @@ function runSqliteMigrations(sdb) {
         CREATE TABLE feedback (id TEXT PRIMARY KEY, user_id TEXT REFERENCES users(id) ON DELETE SET NULL, kind TEXT NOT NULL DEFAULT 'contact', email TEXT, message TEXT NOT NULL, meta_json TEXT NOT NULL DEFAULT '{}', status TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL);
         CREATE INDEX idx_feedback_created ON feedback(created_at);
       `) },
+    { version: 5, up: () => sdb.exec(`
+        CREATE TABLE shares (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, token TEXT NOT NULL UNIQUE, target_type TEXT NOT NULL, target_id TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(user_id, target_type, target_id));
+        CREATE INDEX idx_shares_token ON shares(token);
+      `) },
   ];
   const current = sdb.prepare('SELECT MAX(version) AS v FROM schema_migrations').get()?.v ?? 0;
   for (const m of migrations) {

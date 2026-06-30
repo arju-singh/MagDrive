@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { mediaUrl, formatBytes, api } from '../api.js';
 import { KindIcon } from './kindIcon.js';
 import MoveToFolderModal from './MoveToFolderModal.jsx';
+import ShareModal from './ShareModal.jsx';
 
 // Full-screen viewer for a file. Handles image / video / audio / pdf / fallback download.
 export default function Viewer({ file, onClose, onChanged, onDeleted, onMoved }) {
   const [name, setName] = useState(file.name);
   const [renaming, setRenaming] = useState(false);
   const [moving, setMoving] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -52,6 +54,7 @@ export default function Viewer({ file, onClose, onChanged, onDeleted, onMoved })
             <button className="btn btn--sm" onClick={() => setRenaming(true)}>Rename</button>
           )}
           <button className="btn btn--sm" onClick={() => setMoving(true)} disabled={busy}>Move</button>
+          <button className="btn btn--sm" onClick={() => setSharing(true)} disabled={busy}>Share</button>
           <a className="btn btn--sm" href={mediaUrl(file.id, { download: true })} download>Download</a>
           <button className="btn btn--sm btn--danger" onClick={remove} disabled={busy}>Delete</button>
           <button className="btn btn--sm btn--ghost" onClick={onClose} aria-label="Close">✕</button>
@@ -77,6 +80,10 @@ export default function Viewer({ file, onClose, onChanged, onDeleted, onMoved })
           onMoved={(updated) => { setMoving(false); onMoved?.(updated); }}
           onClose={() => setMoving(false)}
         />
+      )}
+
+      {sharing && (
+        <ShareModal target={{ type: 'file', id: file.id, title: file.name }} onClose={() => setSharing(false)} />
       )}
     </div>
   );

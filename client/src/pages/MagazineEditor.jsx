@@ -4,6 +4,7 @@ import { api, mediaUrl } from '../api.js';
 import { useRefresh } from '../refresh.jsx';
 import FilePicker from '../components/FilePicker.jsx';
 import Carousel from '../components/Carousel.jsx';
+import ShareModal from '../components/ShareModal.jsx';
 import Icon from '../components/Icon.jsx';
 import { CAROUSEL_VARIANTS } from '../templates.js';
 
@@ -47,6 +48,7 @@ export default function MagazineEditor() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
   const [picker, setPicker] = useState(null); // {target, multiple, kind}
+  const [sharing, setSharing] = useState(false);
   const loadedRef = useRef(false);
 
   useEffect(() => {
@@ -107,6 +109,9 @@ export default function MagazineEditor() {
         <button className="btn btn--ghost" onClick={() => nav('/magazines')}>← Newsstand</button>
         <div className="spacer" style={{ flex: 1 }} />
         <span className="muted" style={{ fontSize: 13 }}>{dirty ? 'Unsaved changes' : 'All changes saved'}</span>
+        <button className="btn" onClick={() => setSharing(true)}>
+          <Icon name="share" size={15} /> Share
+        </button>
         <button className="btn btn--primary" onClick={save} disabled={saving || !dirty}>
           {saving ? <span className="spinner" /> : 'Save'}
         </button>
@@ -178,6 +183,9 @@ export default function MagazineEditor() {
           onPick={onPick}
           onClose={() => setPicker(null)}
         />
+      )}
+      {sharing && (
+        <ShareModal target={{ type: 'magazine', id, title: title || 'Untitled Magazine' }} onClose={() => setSharing(false)} />
       )}
       {toast && <div className="toast">{toast}</div>}
     </>

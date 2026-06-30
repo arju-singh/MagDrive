@@ -7,7 +7,7 @@ const VARIANT_KEYS = new Set(CAROUSEL_VARIANTS.map((v) => v.key));
 // Swipeable Gen-Z carousel. Works as both the live editor preview and the
 // reader view — scroll-snap track + working dots/arrows, with placeholder
 // slides when the user hasn't dropped media in yet.
-export default function Carousel({ fileIds = [], variant = 'swipe', caption = '', size = 'l' }) {
+export default function Carousel({ fileIds = [], variant = 'swipe', caption = '', size = 'l', resolveUrl = mediaUrl }) {
   const v = VARIANT_KEYS.has(variant) ? variant : 'swipe';
   const trackRef = useRef(null);
   const [active, setActive] = useState(0);
@@ -41,7 +41,7 @@ export default function Carousel({ fileIds = [], variant = 'swipe', caption = ''
         {slides.map((s, i) => (
           <div className="carousel-slide" key={hasMedia ? s : `ph-${i}`}>
             {hasMedia
-              ? <img src={mediaUrl(s)} alt="" loading="lazy" />
+              ? <img src={resolveUrl(s)} alt="" loading="lazy" />
               : <div className="carousel-ph"><span>{i + 1}</span></div>}
           </div>
         ))}

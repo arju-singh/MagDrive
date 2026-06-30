@@ -15,6 +15,7 @@ import Legal from './pages/Legal.jsx';
 import Contact from './pages/Contact.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import GoogleCallback from './pages/GoogleCallback.jsx';
+import Shared from './pages/Shared.jsx';
 import CookieConsent from './components/CookieConsent.jsx';
 
 // Fires a consented pageview on every route change.
@@ -59,6 +60,7 @@ export default function App() {
         <Route path="/contact" element={<Contact />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/auth/callback" element={<GoogleCallback />} />
+        <Route path="/s/:token" element={<Shared />} />
 
         {/* Everything else: the app when authed; a landing page + login wall otherwise. */}
         {user ? (

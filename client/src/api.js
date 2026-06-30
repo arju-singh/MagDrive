@@ -45,6 +45,15 @@ export function thumbUrl(fileId) {
   return `${BASE}/api/files/${fileId}/thumb?token=${encodeURIComponent(token || '')}`;
 }
 
+// Public (shared-link) media URLs — no auth token; the share token in the path
+// authorizes access. Server validates the file is in scope for that share.
+export function publicMediaUrl(token, fileId, { download = false } = {}) {
+  return `${BASE}/api/public/${token}/files/${fileId}/${download ? 'download' : 'raw'}`;
+}
+export function publicThumbUrl(token, fileId) {
+  return `${BASE}/api/public/${token}/files/${fileId}/thumb`;
+}
+
 // Cloud media/thumb URLs for a connected provider.
 function cloudUrl(provider, id, sub) {
   const token = tokenStore.get();
@@ -99,6 +108,13 @@ export const api = {
   createMagazine: (b) => request('POST', '/api/magazines', b),
   patchMagazine: (id, b) => request('PATCH', `/api/magazines/${id}`, b),
   deleteMagazine: (id) => request('DELETE', `/api/magazines/${id}`),
+
+  // shares (public links) — type is 'file' | 'magazine'
+  getShare: (type, id) => request('GET', `/api/shares?type=${type}&id=${id}`),
+  createShare: (type, id) => request('POST', '/api/shares', { type, id }),
+  deleteShare: (shareId) => request('DELETE', `/api/shares/${shareId}`),
+  // public read of a shared resource (no auth required)
+  getPublic: (token) => request('GET', `/api/public/${token}`),
 
   // stats
   stats: () => request('GET', '/api/stats'),

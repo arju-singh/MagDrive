@@ -166,7 +166,8 @@ router.get('/:id', requireAuth, async (req, res) => {
 });
 
 // Shared streamer with HTTP Range support (video scrubbing, large files).
-function streamFile(f, req, res, { download } = {}) {
+// Exported so the public-share router can stream shared media identically.
+export function streamFile(f, req, res, { download } = {}) {
   const size = f.size;
   const range = req.headers.range;
   res.setHeader('Content-Type', f.mime);
@@ -266,22 +267,23 @@ async function sendThumb(f, res) {
   res.send(buf);
 }
 
+// Serve a file's cached thumbnail, generating it lazily if needed. Returns true if
+// a thumbnail was sent, false if none is available (caller should 404 / fall back).
+// Exported for reuse by the public-share router.
+export async function serveThumb(f, res) {
+  if (f.thumb_status === 'ready' && f.thumb_key) { await sendThumb(f, res); return true; }
+  if (f.thumb_status === 'failed' || f.thumb_status === 'unsupported' || !THUMBNABLE.includes(f.kind)) return false;
+  await scheduleThumb(f);
+  const nf = await db.get('SELECT * FROM files WHERE id = ?', [f.id]);
+  if (nf?.thumb_status === 'ready' && nf.thumb_key) { await sendThumb(nf, res); return true; }
+  return false;
+}
+
 // GET /api/files/:id/thumb — cached JPEG thumbnail; generated lazily on first view.
 router.get('/:id/thumb', requireAuthFlexible, async (req, res) => {
   const f = await getOwnedFile(req.user.id, req.params.id);
   if (!f) return res.status(404).json({ error: 'not_found' });
-
-  if (f.thumb_status === 'ready' && f.thumb_key) return sendThumb(f, res);
-  if (f.thumb_status === 'failed' || f.thumb_status === 'unsupported' || !THUMBNABLE.includes(f.kind)) {
-    return res.status(404).json({ error: 'no_thumb' });
-  }
-
-  // status 'none' → fallback path if pre-generation hasn't finished yet (or is disabled).
-  await scheduleThumb(f);
-
-  const nf = await getOwnedFile(req.user.id, f.id);
-  if (nf?.thumb_status === 'ready' && nf.thumb_key) return sendThumb(nf, res);
-  return res.status(404).json({ error: 'no_thumb' });
+  if (!(await serveThumb(f, res))) return res.status(404).json({ error: 'no_thumb' });
 });
 
 // GET /api/files/:id/download — attachment

@@ -129,3 +129,14 @@ CREATE TABLE IF NOT EXISTS feedback (
   created_at text NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback(created_at);
+
+CREATE TABLE IF NOT EXISTS shares (
+  id          text PRIMARY KEY,
+  user_id     text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token       text NOT NULL UNIQUE,
+  target_type text NOT NULL,
+  target_id   text NOT NULL,
+  created_at  text NOT NULL,
+  UNIQUE(user_id, target_type, target_id)
+);
+CREATE INDEX IF NOT EXISTS idx_shares_token ON shares(token);
